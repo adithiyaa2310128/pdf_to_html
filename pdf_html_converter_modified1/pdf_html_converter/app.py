@@ -1,4 +1,3 @@
-import time
 from flask import Flask, request, render_template_string
 import os
 import pdfplumber
@@ -6,6 +5,7 @@ import html
 import base64
 from io import BytesIO
 import re
+import time
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
@@ -16,14 +16,15 @@ def home():
     return '''
     <h2>Upload PDF</h2>
     <form method="POST" action="/convert" enctype="multipart/form-data">
-        <input type="file" name="pdf">
+        <input type="file" name="pdf" required>
         <button type="submit">Convert</button>
     </form>
     '''
 
 @app.route('/convert', methods=['POST'])
 def convert_pdf():
-    start_time = time.time() 
+    start_time = time.time()
+
     pdf_file = request.files['pdf']
     filepath = os.path.join(UPLOAD_FOLDER, pdf_file.filename)
     pdf_file.save(filepath)
@@ -39,18 +40,15 @@ def convert_pdf():
             pdf_height = page.height
             scale_factor = target_width / pdf_width
 
-            # Table bounding boxes
             table_bboxes = [table.bbox for table in page.find_tables()]
 
             def is_inside_table(x0, top, x1, bottom):
                 for tb_x0, tb_top, tb_x1, tb_bottom in table_bboxes:
-                    if (x0 >= tb_x0 and x1 <= tb_x1 and
-                        top >= tb_top and bottom <= tb_bottom):
+                    if (x0 >= tb_x0 and x1 <= tb_x1 and top >= tb_top and bottom <= tb_bottom):
                         return True
                 return False
 
-            # Text
-            for word in page.extract_words(keep_blank_chars=True, use_text_flow=True):
+            for word in page.extract_words(keep_blank_chars=True, use_text_flow=True, extra_attrs=["fontname"]):
                 x0 = word['x0']
                 x1 = word['x1']
                 top = word['top']
@@ -61,16 +59,27 @@ def convert_pdf():
 
                 raw_text = word['text']
                 escaped_text = html.escape(raw_text)
+                font_name = word.get("fontname", "")
 
-                # Wrap URLs
+                # URL wrapping
                 url_pattern = r'(https?://[^\s]+)'
                 linked_text = re.sub(url_pattern, r'<a href="\1" target="_blank">\1</a>', escaped_text)
+
+                # Font styling
+                is_bold = "Bold" in font_name or "bold" in font_name
+                is_italic = "Italic" in font_name or "Oblique" in font_name
 
                 height = bottom - top
                 font_size = round(height * scale_factor, 1)
                 top_scaled = round(top * scale_factor, 1)
                 left_scaled = round(x0 * scale_factor, 1)
-                style = f"top: {top_scaled}px; left: {left_scaled}px; font-size: {font_size}px;"
+
+                style = (
+                    f"top: {top_scaled}px; left: {left_scaled}px; font-size: {font_size}px;"
+                    f"{'font-weight: bold;' if is_bold else ''}"
+                    f"{'font-style: italic;' if is_italic else ''}"
+                )
+
                 elements.append(f'<div class="positioned-text" style="{style}">{linked_text}</div>')
 
             # Tables
@@ -83,12 +92,12 @@ def convert_pdf():
                 top_scaled = top * scale_factor
                 left_scaled = x0 * scale_factor
 
-                table_html = "<table style='border-collapse: collapse; width: 100%; height: 100%;'>"
+                table_html = "<table>"
                 for row in table.extract():
                     table_html += "<tr>"
                     for cell in row:
                         content = html.escape(cell or "")
-                        table_html += f"<td style='border: 1px solid #000; padding: 2px;'>{content}</td>"
+                        table_html += f"<td>{content}</td>"
                     table_html += "</tr>"
                 table_html += "</table>"
 
@@ -127,20 +136,20 @@ def convert_pdf():
                     print(f"Image on page {page_count} skipped due to error: {e}")
 
             html_body = "\n".join(elements)
-
             page_html = f"""
-            <div class="page-container" style="width: {target_width}px; height: {int(pdf_height * scale_factor)}px;">
+            <div class="page-container" style="height: {int(pdf_height * scale_factor)}px;">
                 {html_body}
             </div>
             """
             full_html += page_html + "\n"
-    end_time = time.time()
-    conversion_time = round(end_time - start_time, 2)
+
+    conversion_time = round(time.time() - start_time, 2)
 
     final_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="utf-8">
         <title>PDF Converted</title>
         <style>
             body {{
@@ -149,12 +158,20 @@ def convert_pdf():
                 padding: 0;
                 background: #eee;
             }}
+            .info-bar {{
+                padding: 12px;
+                font-size: 14px;
+                background-color: #f0f0f0;
+                border-bottom: 1px solid #ccc;
+                font-family: monospace;
+            }}
             .page-container {{
                 position: relative;
                 margin: 30px auto;
                 background: white;
                 border: 1px solid #ccc;
                 box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                width: {target_width}px;
             }}
             .positioned-text {{
                 position: absolute;
@@ -170,7 +187,14 @@ def convert_pdf():
                 position: absolute;
                 object-fit: contain;
             }}
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+                height: 100%;
+            }}
             table td {{
+                border: 1px solid #000;
+                padding: 2px;
                 vertical-align: top;
                 font-size: 12px;
             }}
@@ -185,14 +209,15 @@ def convert_pdf():
         </script>
     </head>
     <body>
-        <div style="padding:10px; font-family:Arial;">
-            <b>Server conversion time:</b> {conversion_time} seconds<br>
+        <div class="info-bar">
+            <b>Server conversion time:</b> {conversion_time} seconds |
             <b>Browser render time:</b> <span id="render-time">...</span>
         </div>
         {full_html}
     </body>
     </html>
     """
+
     return render_template_string(final_html)
 
 if __name__ == '__main__':
