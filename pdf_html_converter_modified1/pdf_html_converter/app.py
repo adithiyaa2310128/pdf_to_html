@@ -1,180 +1,199 @@
-from flask import Flask, request, redirect, url_for, send_file
+import time
+from flask import Flask, request, render_template_string
 import os
 import pdfplumber
 import html
-from PIL import Image
+import base64
+from io import BytesIO
 import re
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
-OUTPUT_FOLDER = "outputs"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 @app.route('/')
 def home():
     return '''
-        <h2>Upload PDF to Convert</h2>
-        <form action="/convert" method="post" enctype="multipart/form-data">
-            <input type="file" name="pdf">
-            <button type="submit">Upload</button>
-        </form>
+    <h2>Upload PDF</h2>
+    <form method="POST" action="/convert" enctype="multipart/form-data">
+        <input type="file" name="pdf">
+        <button type="submit">Convert</button>
+    </form>
     '''
 
 @app.route('/convert', methods=['POST'])
 def convert_pdf():
+    start_time = time.time() 
     pdf_file = request.files['pdf']
     filepath = os.path.join(UPLOAD_FOLDER, pdf_file.filename)
     pdf_file.save(filepath)
 
-    for file in os.listdir(OUTPUT_FOLDER):
-        os.remove(os.path.join(OUTPUT_FOLDER, file))
-
-    page_count = 0
+    full_html = ""
+    target_width = 960
 
     with pdfplumber.open(filepath) as pdf:
-        for page in pdf.pages:
-            page_count += 1
+        for page_count, page in enumerate(pdf.pages, 1):
             elements = []
 
             pdf_width = page.width
             pdf_height = page.height
-            target_width = 960  # Target display width (full window)
             scale_factor = target_width / pdf_width
 
-            # Extract text with estimated font size
+            # Table bounding boxes
+            table_bboxes = [table.bbox for table in page.find_tables()]
+
+            def is_inside_table(x0, top, x1, bottom):
+                for tb_x0, tb_top, tb_x1, tb_bottom in table_bboxes:
+                    if (x0 >= tb_x0 and x1 <= tb_x1 and
+                        top >= tb_top and bottom <= tb_bottom):
+                        return True
+                return False
+
+            # Text
             for word in page.extract_words(keep_blank_chars=True, use_text_flow=True):
-                text = html.escape(word['text'])
-                height = word['bottom'] - word['top']
+                x0 = word['x0']
+                x1 = word['x1']
+                top = word['top']
+                bottom = word['bottom']
+
+                if is_inside_table(x0, top, x1, bottom):
+                    continue
+
+                raw_text = word['text']
+                escaped_text = html.escape(raw_text)
+
+                # Wrap URLs
+                url_pattern = r'(https?://[^\s]+)'
+                linked_text = re.sub(url_pattern, r'<a href="\1" target="_blank">\1</a>', escaped_text)
+
+                height = bottom - top
                 font_size = round(height * scale_factor, 1)
-                top = round(word['top'] * scale_factor, 1)
-                left = round(word['x0'] * scale_factor, 1)
-                style = f"top: {top}px; left: {left}px; font-size: {font_size}px;"
-                elements.append(f'<div class="positioned-text" style="{style}">{text}</div>')
+                top_scaled = round(top * scale_factor, 1)
+                left_scaled = round(x0 * scale_factor, 1)
+                style = f"top: {top_scaled}px; left: {left_scaled}px; font-size: {font_size}px;"
+                elements.append(f'<div class="positioned-text" style="{style}">{linked_text}</div>')
 
-            # Extract and scale images
+            # Tables
+            for table in page.find_tables():
+                if not table.cells:
+                    continue
+                x0, top, x1, bottom = table.bbox
+                width = (x1 - x0) * scale_factor
+                height = (bottom - top) * scale_factor
+                top_scaled = top * scale_factor
+                left_scaled = x0 * scale_factor
+
+                table_html = "<table style='border-collapse: collapse; width: 100%; height: 100%;'>"
+                for row in table.extract():
+                    table_html += "<tr>"
+                    for cell in row:
+                        content = html.escape(cell or "")
+                        table_html += f"<td style='border: 1px solid #000; padding: 2px;'>{content}</td>"
+                    table_html += "</tr>"
+                table_html += "</table>"
+
+                elements.append(f"""
+                <div style="position: absolute; top: {top_scaled}px; left: {left_scaled}px;
+                            width: {width}px; height: {height}px;">
+                    {table_html}
+                </div>
+                """)
+
+            # Images
             for idx, img in enumerate(page.images):
-                bbox = (img['x0'], img['top'], img['x1'], img['bottom'])
-                cropped = page.crop(bbox).to_image(resolution=150)
-                image_filename = f'page_{page_count}_img_{idx+1}.png'
-                image_path = os.path.join(OUTPUT_FOLDER, image_filename)
-                cropped.save(image_path, format='PNG')
+                x0 = max(0, img['x0'])
+                top = max(0, img['top'])
+                x1 = min(pdf_width, img['x1'])
+                bottom = min(pdf_height, img['bottom'])
 
-                style = (
-                    f"top: {round(img['top'] * scale_factor, 1)}px; "
-                    f"left: {round(img['x0'] * scale_factor, 1)}px; "
-                    f"width: {round((img['x1'] - img['x0']) * scale_factor, 1)}px; "
-                    f"height: {round((img['bottom'] - img['top']) * scale_factor, 1)}px;"
-                )
-                elements.append(f'<img src="/outputs/{image_filename}" class="positioned-image" style="{style}">')
+                bbox = (x0, top, x1, bottom)
+                try:
+                    cropped = page.crop(bbox).to_image(resolution=360)
+                    buffer = BytesIO()
+                    cropped.save(buffer, format='PNG')
+                    buffer.seek(0)
+                    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+                    style = (
+                        f"top: {round(top * scale_factor, 1)}px; "
+                        f"left: {round(x0 * scale_factor, 1)}px; "
+                        f"width: {round((x1 - x0) * scale_factor, 1)}px; "
+                        f"height: {round((bottom - top) * scale_factor, 1)}px;"
+                    )
+                    elements.append(
+                        f'<img src="data:image/png;base64,{img_base64}" class="positioned-image" style="{style}">'
+                    )
+                except Exception as e:
+                    print(f"Image on page {page_count} skipped due to error: {e}")
 
             html_body = "\n".join(elements)
 
-            html_template = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Page {page_count}</title>
-                <style>
-                    body {{
-                        font-family: Arial, sans-serif;
-                        margin: 0;
-                        padding: 0;
-                        overflow: auto;
-                    }}
-                    .page-container {{
-                        position: relative;
-                        width: {target_width}px;
-                        height: {int(pdf_height * scale_factor)}px;
-                        margin: auto;
-                        background: #fff;
-                    }}
-                    .positioned-text {{
-                        position: absolute;
-                        white-space: pre;
-                        color: #000;
-                    }}
-                    .positioned-image {{
-                        position: absolute;
-                        object-fit: contain;
-                    }}
-                </style>
-            </head>
-            <body>
-                <div class="page-container">
-                    {html_body}
-                </div>
-            </body>
-            </html>
+            page_html = f"""
+            <div class="page-container" style="width: {target_width}px; height: {int(pdf_height * scale_factor)}px;">
+                {html_body}
+            </div>
             """
+            full_html += page_html + "\n"
+    end_time = time.time()
+    conversion_time = round(end_time - start_time, 2)
 
-            with open(os.path.join(OUTPUT_FOLDER, f'page_{page_count}.html'), 'w', encoding='utf-8') as f:
-                f.write(html_template)
-
-    return redirect(url_for('show_pages'))
-
-@app.route('/pages')
-def show_pages():
-    query = request.args.get('q', '').strip().lower()
-
-    def extract_page_number(filename):
-        match = re.search(r'page_(\d+)\.html', filename)
-        return int(match.group(1)) if match else float('inf')
-
-    all_pages = sorted(
-        [f for f in os.listdir(OUTPUT_FOLDER) if f.endswith('.html')],
-        key=extract_page_number
-    )
-
-    matching_pages = []
-
-    if query:
-        for page in all_pages:
-            filepath = os.path.join(OUTPUT_FOLDER, page)
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read().lower()
-                if query in content:
-                    matching_pages.append(page)
-    else:
-        matching_pages = all_pages
-
-    if not matching_pages:
-        results_html = f"<p>No results found for <b>{query}</b></p>"
-    else:
-        results_html = ''.join(
-            f'<li><a href="/outputs/{page}">{page}</a></li>' for page in matching_pages
-        )
-
-    search_form = f'''
-        <form method="get" action="/pages">
-            <input type="text" name="q" placeholder="Search text..." value="{query}">
-            <button type="submit">Search</button>
-        </form>
-        <br>
-    '''
-
-    return f"""
-        <h2>{'Search Results' if query else 'Converted Pages'} ({len(matching_pages)} pages)</h2>
-        {search_form}
-        <ul>{results_html}</ul>
-        <br><a href="/pages">View All</a>
+    final_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>PDF Converted</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: #eee;
+            }}
+            .page-container {{
+                position: relative;
+                margin: 30px auto;
+                background: white;
+                border: 1px solid #ccc;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            }}
+            .positioned-text {{
+                position: absolute;
+                white-space: pre;
+                color: #000;
+                text-decoration: none;
+            }}
+            .positioned-text a {{
+                color: blue;
+                text-decoration: underline;
+            }}
+            .positioned-image {{
+                position: absolute;
+                object-fit: contain;
+            }}
+            table td {{
+                vertical-align: top;
+                font-size: 12px;
+            }}
+        </style>
+        <script>
+            const t0 = performance.now();
+            window.onload = () => {{
+                const t1 = performance.now();
+                const renderTime = (t1 - t0).toFixed(2);
+                document.getElementById("render-time").innerText = renderTime + " ms";
+            }};
+        </script>
+    </head>
+    <body>
+        <div style="padding:10px; font-family:Arial;">
+            <b>Server conversion time:</b> {conversion_time} seconds<br>
+            <b>Browser render time:</b> <span id="render-time">...</span>
+        </div>
+        {full_html}
+    </body>
+    </html>
     """
-
-@app.route('/outputs/<filename>')
-def show_output(filename):
-    filepath = os.path.join(OUTPUT_FOLDER, filename)
-    if os.path.exists(filepath):
-        if filename.endswith('.html'):
-            with open(filepath, 'r', encoding='utf-8') as f:
-                return f.read()
-        else:
-            return send_file(filepath, mimetype='image/png')
-    return "File not found", 404
-
-@app.route('/download/<filename>')
-def file_download(filename):
-    download=os.path.join(OUTPUT_FOLDER, filename)
-    return f"<link>"
+    return render_template_string(final_html)
 
 if __name__ == '__main__':
     app.run(debug=True)
