@@ -1,0 +1,76 @@
+
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Page 19</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 0;
+                        overflow: auto;
+                    }
+                    .page-container {
+                        position: relative;
+                        width: 960px;
+                        height: 1357px;
+                        margin: auto;
+                        background: #fff;
+                    }
+                    .positioned-text {
+                        position: absolute;
+                        white-space: pre;
+                        color: #000;
+                        text-decoration: none;
+                    }
+                    .positioned-text a {
+                        color: blue;
+                        text-decoration: underline;
+                    }
+                    .positioned-image {
+                        position: absolute;
+                        object-fit: contain;
+                    }
+                    table td {
+                        vertical-align: top;
+                        font-size: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page-container">
+                    <div class="positioned-text" style="top: 118.6px; left: 174.2px; font-size: 19.3px;">The unidirectional flow of data and the circular connection path of the ring topology </div>
+<div class="positioned-text" style="top: 144.1px; left: 174.2px; font-size: 19.3px;">network must be simulated using twisted python.  </div>
+<div class="positioned-text" style="top: 169.7px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 567.1px; left: 786.0px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 588.0px; left: 509.1px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 613.9px; left: 407.7px; font-size: 19.6px;">Figure 4: Ring Topology </div>
+<div class="positioned-text" style="top: 639.3px; left: 509.1px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 665.0px; left: 116.1px; font-size: 19.3px;">CODE: </div>
+<div class="positioned-text" style="top: 690.5px; left: 116.1px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 712.3px; left: 145.1px; font-size: 23.3px;">a) </div>
+<div class="positioned-text" style="top: 716.3px; left: 174.2px; font-size: 19.3px;">Star topology:  </div>
+<div class="positioned-text" style="top: 741.6px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 767.2px; left: 174.2px; font-size: 19.3px;">&#x27;&#x27;&#x27;server implementation&#x27;&#x27;&#x27; </div>
+<div class="positioned-text" style="top: 792.7px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 818.5px; left: 174.2px; font-size: 19.3px;">from twisted.internet import protocol,reactor </div>
+<div class="positioned-text" style="top: 844.0px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 869.6px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 895.1px; left: 174.2px; font-size: 19.3px;">class StarProtocol(protocol.Protocol): </div>
+<div class="positioned-text" style="top: 920.8px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 946.4px; left: 174.2px; font-size: 19.3px;">    def __init__(self,factory): </div>
+<div class="positioned-text" style="top: 971.9px; left: 174.2px; font-size: 19.3px;">        self.factory = factory   #factory that stores all the clients connected to the server  </div>
+<div class="positioned-text" style="top: 997.5px; left: 174.2px; font-size: 19.3px;">        self.name = None         #name of the client that will connect to the server  </div>
+<div class="positioned-text" style="top: 1023.2px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1048.7px; left: 174.2px; font-size: 19.3px;">    def connectionMade(self): </div>
+<div class="positioned-text" style="top: 1074.3px; left: 174.2px; font-size: 19.3px;">        &#x27;&#x27;&#x27;establishing a connection to the server&#x27;&#x27;&#x27; </div>
+<div class="positioned-text" style="top: 1099.8px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1125.4px; left: 174.2px; font-size: 19.3px;">        print(&#x27;New client connected: &#x27;,self.transport.getPeer()) </div>
+<div class="positioned-text" style="top: 1151.1px; left: 174.2px; font-size: 19.3px;">        self.factory.clients.append(self) </div>
+<div class="positioned-text" style="top: 1176.6px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1202.2px; left: 174.2px; font-size: 19.3px;">    def connectionLost(self, reason): </div>
+<img src="/outputs/page_19_img_1.png" class="positioned-image" style="top: 192.8px; left: 232.1px; width: 552.6px; height: 388.1px;">
+                </div>
+            </body>
+            </html>
+            

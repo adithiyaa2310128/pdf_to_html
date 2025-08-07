@@ -1,0 +1,101 @@
+
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Page 25</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 0;
+                        overflow: auto;
+                    }
+                    .page-container {
+                        position: relative;
+                        width: 960px;
+                        height: 1357px;
+                        margin: auto;
+                        background: #fff;
+                    }
+                    .positioned-text {
+                        position: absolute;
+                        white-space: pre;
+                        color: #000;
+                        text-decoration: none;
+                    }
+                    .positioned-text a {
+                        color: blue;
+                        text-decoration: underline;
+                    }
+                    .positioned-image {
+                        position: absolute;
+                        object-fit: contain;
+                    }
+                    table td {
+                        vertical-align: top;
+                        font-size: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page-container">
+                    <div class="positioned-text" style="top: 118.6px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 144.1px; left: 174.2px; font-size: 19.3px;">        if not self.name: </div>
+<div class="positioned-text" style="top: 169.7px; left: 174.2px; font-size: 19.3px;">            self.name = message </div>
+<div class="positioned-text" style="top: 195.4px; left: 174.2px; font-size: 19.3px;">            print(f&quot;{self.name} connected to bus.&quot;) </div>
+<div class="positioned-text" style="top: 220.9px; left: 174.2px; font-size: 19.3px;">        else: </div>
+<div class="positioned-text" style="top: 246.5px; left: 174.2px; font-size: 19.3px;">            if message.startswith(&quot;@&quot;): </div>
+<div class="positioned-text" style="top: 272.0px; left: 174.2px; font-size: 19.3px;">                recipient, private_message = message[1:].split(&quot;:&quot;, 1) </div>
+<div class="positioned-text" style="top: 297.7px; left: 174.2px; font-size: 19.3px;">                self.sendPrivateMessage(recipient, private_message) </div>
+<div class="positioned-text" style="top: 323.3px; left: 174.2px; font-size: 19.3px;">            else: </div>
+<div class="positioned-text" style="top: 348.8px; left: 174.2px; font-size: 19.3px;">                print(f&quot;{self.name}: {message}&quot;) </div>
+<div class="positioned-text" style="top: 374.4px; left: 174.2px; font-size: 19.3px;">                self.broadcastMessage(f&quot;{self.name}: {message}&quot;) </div>
+<div class="positioned-text" style="top: 400.1px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 425.7px; left: 174.2px; font-size: 19.3px;">    def sendPrivateMessage(self, recipient, message): </div>
+<div class="positioned-text" style="top: 451.2px; left: 174.2px; font-size: 19.3px;">        for client in self.factory.clients: </div>
+<div class="positioned-text" style="top: 476.8px; left: 174.2px; font-size: 19.3px;">            if client.name == recipient: </div>
+<div class="positioned-text" style="top: 502.5px; left: 174.2px; font-size: 19.3px;">                client.transport.write(f&quot;(Private) {self.name}: {message}\n&quot;.encode()) </div>
+<div class="positioned-text" style="top: 528.0px; left: 174.2px; font-size: 19.3px;">                break </div>
+<div class="positioned-text" style="top: 553.6px; left: 174.2px; font-size: 19.3px;">        else: </div>
+<div class="positioned-text" style="top: 579.1px; left: 174.2px; font-size: 19.3px;">            self.transport.write(f&quot;Error: User {recipient} not found.\n&quot;.encode()) </div>
+<div class="positioned-text" style="top: 604.8px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 630.4px; left: 174.2px; font-size: 19.3px;">    def broadcastMessage(self, message): </div>
+<div class="positioned-text" style="top: 655.9px; left: 174.2px; font-size: 19.3px;">        for client in self.factory.clients: </div>
+<div class="positioned-text" style="top: 681.5px; left: 174.2px; font-size: 19.3px;">            if client != self: </div>
+<div class="positioned-text" style="top: 707.0px; left: 174.2px; font-size: 19.3px;">                client.transport.write(f&quot;{message}\n&quot;.encode()) </div>
+<div class="positioned-text" style="top: 732.7px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 758.3px; left: 174.2px; font-size: 19.3px;">class BusBackbone(protocol.Factory): </div>
+<div class="positioned-text" style="top: 783.8px; left: 174.2px; font-size: 19.3px;">    def __init__(self): </div>
+<div class="positioned-text" style="top: 809.4px; left: 174.2px; font-size: 19.3px;">        self.clients = [] </div>
+<div class="positioned-text" style="top: 835.1px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 860.6px; left: 174.2px; font-size: 19.3px;">    def buildProtocol(self, addr): </div>
+<div class="positioned-text" style="top: 886.2px; left: 174.2px; font-size: 19.3px;">        return DropLink(self) </div>
+<div class="positioned-text" style="top: 911.8px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 937.5px; left: 174.2px; font-size: 19.3px;">if __name__ == &quot;__main__&quot;: </div>
+<div class="positioned-text" style="top: 963.0px; left: 174.2px; font-size: 19.3px;">    reactor.listenTCP(8000, BusBackbone()) </div>
+<div class="positioned-text" style="top: 988.6px; left: 174.2px; font-size: 19.3px;">    print(&quot;Bus server started.&quot;) </div>
+<div class="positioned-text" style="top: 1014.1px; left: 174.2px; font-size: 19.3px;">    print(&quot;Enter </div>
+<div class="positioned-text" style="top: 1014.1px; left: 296.8px; font-size: 19.3px;">your </div>
+<div class="positioned-text" style="top: 1014.1px; left: 342.4px; font-size: 19.3px;">name </div>
+<div class="positioned-text" style="top: 1014.1px; left: 394.8px; font-size: 19.3px;">as </div>
+<div class="positioned-text" style="top: 1014.1px; left: 421.3px; font-size: 19.3px;">first </div>
+<div class="positioned-text" style="top: 1014.1px; left: 462.9px; font-size: 19.3px;">message </div>
+<div class="positioned-text" style="top: 1014.1px; left: 538.5px; font-size: 19.3px;">to </div>
+<div class="positioned-text" style="top: 1014.1px; left: 564.2px; font-size: 19.3px;">register. </div>
+<div class="positioned-text" style="top: 1014.1px; left: 637.2px; font-size: 19.3px;">To </div>
+<div class="positioned-text" style="top: 1014.1px; left: 669.1px; font-size: 19.3px;">send </div>
+<div class="positioned-text" style="top: 1014.1px; left: 715.0px; font-size: 19.3px;">a </div>
+<div class="positioned-text" style="top: 1014.1px; left: 733.9px; font-size: 19.3px;">message </div>
+<div class="positioned-text" style="top: 1014.1px; left: 809.7px; font-size: 19.3px;">to </div>
+<div class="positioned-text" style="top: 1014.1px; left: 835.2px; font-size: 19.3px;">a </div>
+<div class="positioned-text" style="top: 1039.8px; left: 174.2px; font-size: 19.3px;">particular username use &#x27;@username: message&#x27;.&quot;) </div>
+<div class="positioned-text" style="top: 1065.4px; left: 174.2px; font-size: 19.3px;">    reactor.run() </div>
+<div class="positioned-text" style="top: 1090.9px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1116.4px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1142.2px; left: 116.1px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1167.9px; left: 116.1px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1167.9px; left: 348.3px; font-size: 19.3px;"> </div>
+                </div>
+            </body>
+            </html>
+            

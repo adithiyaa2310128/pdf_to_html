@@ -1,0 +1,90 @@
+
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Page 21</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 0;
+                        overflow: auto;
+                    }
+                    .page-container {
+                        position: relative;
+                        width: 960px;
+                        height: 1357px;
+                        margin: auto;
+                        background: #fff;
+                    }
+                    .positioned-text {
+                        position: absolute;
+                        white-space: pre;
+                        color: #000;
+                        text-decoration: none;
+                    }
+                    .positioned-text a {
+                        color: blue;
+                        text-decoration: underline;
+                    }
+                    .positioned-image {
+                        position: absolute;
+                        object-fit: contain;
+                    }
+                    table td {
+                        vertical-align: top;
+                        font-size: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page-container">
+                    <div class="positioned-text" style="top: 118.6px; left: 174.2px; font-size: 19.3px;">        return StarProtocol() </div>
+<div class="positioned-text" style="top: 144.1px; left: 174.2px; font-size: 19.3px;">     </div>
+<div class="positioned-text" style="top: 169.7px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 195.4px; left: 174.2px; font-size: 19.3px;">if __name__ == &quot;__main__&quot;: </div>
+<div class="positioned-text" style="top: 220.9px; left: 174.2px; font-size: 19.3px;">    reactor.listenTCP(8080, StarFactory()) </div>
+<div class="positioned-text" style="top: 246.5px; left: 174.2px; font-size: 19.3px;">    print(&quot;Server started. Listening on port 8080...&quot;) </div>
+<div class="positioned-text" style="top: 272.0px; left: 174.2px; font-size: 19.3px;">    print(&quot;Enter client name to register. Enter @ before the starting of a message to </div>
+<div class="positioned-text" style="top: 297.7px; left: 174.2px; font-size: 19.3px;">send message to another client.&quot;) </div>
+<div class="positioned-text" style="top: 323.3px; left: 174.2px; font-size: 19.3px;">    reactor.run() </div>
+<div class="positioned-text" style="top: 348.8px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 370.6px; left: 145.1px; font-size: 23.3px;">b) </div>
+<div class="positioned-text" style="top: 374.6px; left: 174.2px; font-size: 19.3px;">Mesh Topology: </div>
+<div class="positioned-text" style="top: 400.3px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 425.7px; left: 174.2px; font-size: 19.3px;">from twisted.internet import reactor, protocol </div>
+<div class="positioned-text" style="top: 451.2px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 476.8px; left: 174.2px; font-size: 19.3px;">class MeshProtocol(protocol.Protocol): </div>
+<div class="positioned-text" style="top: 502.5px; left: 174.2px; font-size: 19.3px;">    def __init__(self, factory): </div>
+<div class="positioned-text" style="top: 528.0px; left: 174.2px; font-size: 19.3px;">        self.factory = factory </div>
+<div class="positioned-text" style="top: 553.6px; left: 174.2px; font-size: 19.3px;">        self.name = None </div>
+<div class="positioned-text" style="top: 579.1px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 604.8px; left: 174.2px; font-size: 19.3px;">    def connectionMade(self): </div>
+<div class="positioned-text" style="top: 630.4px; left: 174.2px; font-size: 19.3px;">        self.factory.clients.append(self) </div>
+<div class="positioned-text" style="top: 655.9px; left: 174.2px; font-size: 19.3px;">        print(&quot;New client connected.&quot;) </div>
+<div class="positioned-text" style="top: 681.5px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 707.0px; left: 174.2px; font-size: 19.3px;">    def connectionLost(self, reason): </div>
+<div class="positioned-text" style="top: 732.7px; left: 174.2px; font-size: 19.3px;">        self.factory.clients.remove(self) </div>
+<div class="positioned-text" style="top: 758.3px; left: 174.2px; font-size: 19.3px;">        print(&quot;Client disconnected.&quot;) </div>
+<div class="positioned-text" style="top: 783.8px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 809.4px; left: 174.2px; font-size: 19.3px;">    def dataReceived(self, data): </div>
+<div class="positioned-text" style="top: 835.1px; left: 174.2px; font-size: 19.3px;">        message = data.decode().strip() </div>
+<div class="positioned-text" style="top: 860.6px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 886.2px; left: 174.2px; font-size: 19.3px;">        if not self.name: </div>
+<div class="positioned-text" style="top: 911.8px; left: 174.2px; font-size: 19.3px;">            self.name = message </div>
+<div class="positioned-text" style="top: 937.5px; left: 174.2px; font-size: 19.3px;">            print(f&quot;{self.name} joined the chat.&quot;) </div>
+<div class="positioned-text" style="top: 963.0px; left: 174.2px; font-size: 19.3px;">        else: </div>
+<div class="positioned-text" style="top: 988.6px; left: 174.2px; font-size: 19.3px;">            if message.startswith(&quot;@&quot;): </div>
+<div class="positioned-text" style="top: 1014.1px; left: 174.2px; font-size: 19.3px;">                recipient, private_message = message[1:].split(&quot;:&quot;, 1) </div>
+<div class="positioned-text" style="top: 1039.8px; left: 174.2px; font-size: 19.3px;">                self.sendPrivateMessage(recipient, private_message) </div>
+<div class="positioned-text" style="top: 1065.4px; left: 174.2px; font-size: 19.3px;">            else: </div>
+<div class="positioned-text" style="top: 1090.9px; left: 174.2px; font-size: 19.3px;">                print(f&quot;{self.name}: {message}&quot;) </div>
+<div class="positioned-text" style="top: 1116.4px; left: 174.2px; font-size: 19.3px;">                self.broadcastMessage(f&quot;{self.name}: {message}&quot;) </div>
+<div class="positioned-text" style="top: 1142.2px; left: 174.2px; font-size: 19.3px;"> </div>
+<div class="positioned-text" style="top: 1167.7px; left: 174.2px; font-size: 19.3px;">    def sendPrivateMessage(self, recipient, message): </div>
+<div class="positioned-text" style="top: 1193.3px; left: 174.2px; font-size: 19.3px;">        for client in self.factory.clients: </div>
+<div class="positioned-text" style="top: 1218.8px; left: 174.2px; font-size: 19.3px;">            if client.name == recipient: </div>
+                </div>
+            </body>
+            </html>
+            

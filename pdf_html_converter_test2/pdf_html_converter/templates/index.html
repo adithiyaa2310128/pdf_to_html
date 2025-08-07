@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF to HTML Converter</title>
+    <link rel="stylesheet" href="./static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>PDF to HTML Converter</h1>
+        <form class="upload-form" id="uploadForm" enctype="multipart/form-data">
+            <input type="file" id="pdfFile" name="pdf" accept=".pdf" required>
+            <button type="submit" id="convertBtn">Convert PDF</button>
+        </form>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">
+                <span class="spinner"></span>
+                <span id="progressMessage">Starting conversion...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('pdfFile');
+            const convertBtn = document.getElementById('convertBtn');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressMessage = document.getElementById('progressMessage');
+
+            if (!fileInput.files[0]) {
+                alert('Please select a PDF file');
+                return;
+            }
+
+            // Show progress and disable button
+            convertBtn.disabled = true;
+            convertBtn.textContent = 'Converting...';
+            progressContainer.style.display = 'block';
+
+            const formData = new FormData();
+            formData.append('pdf', fileInput.files[0]);
+
+            
+            try {
+    // Start conversion
+    const response = await fetch('/convert', {
+        method: 'POST',
+        body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        // Backend validation failed – show alert with message
+        alert('Validation failed: ' + data.message);
+        convertBtn.disabled = false;
+        convertBtn.textContent = 'Convert PDF';
+        progressContainer.style.display = 'none';
+        return;
+    }
+
+    const jobId = data.job_id;
+
+    // Poll for progress
+    const pollProgress = setInterval(async () => {
+        try {
+            const progressResponse = await fetch(`/progress/${jobId}`);
+            const progressData = await progressResponse.json();
+
+            progressFill.style.width = progressData.progress + '%';
+            progressMessage.textContent = progressData.message;
+
+            if (progressData.status === 'completed') {
+                clearInterval(pollProgress);
+                window.location.href = `/result/${jobId}`;
+            } else if (progressData.status === 'error') {
+                clearInterval(pollProgress);
+                alert('Conversion failed: ' + progressData.error);
+                convertBtn.disabled = false;
+                convertBtn.textContent = 'Convert PDF';
+                progressContainer.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error polling progress:', error);
+        }
+    }, 500); // Poll every 500ms
+
+} catch (error) {
+    console.error('Error:', error);
+    alert('Conversion failed. Please try again.');
+    convertBtn.disabled = false;
+    convertBtn.textContent = 'Convert PDF';
+    progressContainer.style.display = 'none';
+}
+
+        });
+    </script>
+</body>
+</html>

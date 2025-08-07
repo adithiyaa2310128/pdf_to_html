@@ -1,0 +1,122 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #0d1b3d; /* deep navy */
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.container {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+}
+
+h1 {
+    color: #0d1b3d;
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+}
+
+.upload-form {
+    margin-top: 20px;
+}
+
+input[type="file"] {
+    width: 100%;
+    padding: 16px;
+    margin: 15px 0;
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    background-color: #f9f9f9;
+    color: #333;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    background: #fafafa;
+    box-sizing: border-box; /* Prevent overflow */
+    display: block;
+}
+
+
+input[type="file"]:hover {
+    border-color: #ffb703;
+}
+
+button {
+    background-color: #ffb703; /* accent yellow */
+    color: #0d1b3d;
+    padding: 14px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #e8a100;
+}
+
+button:disabled {
+    background: #ccc;
+    color: #777;
+    cursor: not-allowed;
+}
+
+.progress-container {
+    margin-top: 20px;
+    display: none;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ffb703, #e8a100);
+    transition: width 0.4s ease;
+}
+
+.progress-text {
+    margin-top: 10px;
+    color: #444;
+    font-size: 0.9rem;
+}
+
+.spinner {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #ffb703;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

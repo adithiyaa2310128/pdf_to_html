@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Compare PDF and HTML</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0a1d37; /* Navy Blue */
+            color: #fff;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        iframe {
+            flex: 1;
+            border: none;
+            height: 100%;
+        }
+        h1 {
+            text-align: center;
+            color: #ffdb58; /* Mustard Yellow */
+        }
+    </style>
+</head>
+<body>
+    <h1>Side-by-Side Comparison: Page {{ page_num }}</h1>
+    <div class="container">
+        <iframe src="{{ pdf_url }}"></iframe>
+        <iframe src="{{ html_url }}"></iframe>
+    </div>
+</body>
+</html>

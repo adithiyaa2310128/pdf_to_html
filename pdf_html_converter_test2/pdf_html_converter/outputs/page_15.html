@@ -1,0 +1,88 @@
+
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Page 15</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 0;
+                        overflow: auto;
+                    }
+                    .page-container {
+                        position: relative;
+                        width: 960px;
+                        height: 1357px;
+                        margin: auto;
+                        background: #fff;
+                    }
+                    .positioned-text {
+                        position: absolute;
+                        white-space: pre;
+                        color: #000;
+                        text-decoration: none;
+                    }
+                    .positioned-text a {
+                        color: blue;
+                        text-decoration: underline;
+                    }
+                    .positioned-image {
+                        position: absolute;
+                        object-fit: contain;
+                    }
+                    table td {
+                        vertical-align: top;
+                        font-size: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page-container">
+                    <div class="positioned-text" style="top: 91.8px; left: 130.0px; font-size: 19.3px;">output, error = process.communicate() </div>
+<div class="positioned-text" style="top: 119.0px; left: 130.4px; font-size: 19.3px;">if error: </div>
+<div class="positioned-text" style="top: 146.0px; left: 149.8px; font-size: 19.3px;">self.deferred.errback(error) </div>
+<div class="positioned-text" style="top: 173.1px; left: 130.4px; font-size: 19.3px;">else: </div>
+<div class="positioned-text" style="top: 200.4px; left: 149.8px; font-size: 19.3px;">self.deferred.callback(output) </div>
+<div class="positioned-text" style="top: 223.6px; left: 82.2px; font-size: 27.5px;"> </div>
+<div class="positioned-text" style="top: 254.2px; left: 91.3px; font-size: 19.3px;">def print_result(result): </div>
+<div class="positioned-text" style="top: 281.2px; left: 111.1px; font-size: 19.3px;">print(result.decode()) </div>
+<div class="positioned-text" style="top: 308.8px; left: 82.2px; font-size: 23.4px;"> </div>
+<div class="positioned-text" style="top: 335.2px; left: 91.3px; font-size: 19.3px;">def print_error(failure): </div>
+<div class="positioned-text" style="top: 362.3px; left: 111.1px; font-size: 19.3px;">print(failure) </div>
+<div class="positioned-text" style="top: 390.1px; left: 82.2px; font-size: 23.4px;"> </div>
+<div class="positioned-text" style="top: 416.5px; left: 91.3px; font-size: 19.3px;">protocol = PingProtocol() </div>
+<div class="positioned-text" style="top: 443.4px; left: 91.3px; font-size: 19.3px;">protocol.ping(&#x27;google.com&#x27;) </div>
+<div class="positioned-text" style="top: 470.5px; left: 91.3px; font-size: 19.3px;">protocol.deferred.addCallbacks(print_result, print_error) </div>
+<div class="positioned-text" style="top: 497.5px; left: 91.3px; font-size: 19.3px;">reactor.run() </div>
+<div class="positioned-text" style="top: 525.7px; left: 82.2px; font-size: 23.4px;"> </div>
+<div class="positioned-text" style="top: 548.1px; left: 91.3px; font-size: 27.3px;">b) TRACE ROUTE - TWISTED PYTHON </div>
+<div class="positioned-text" style="top: 582.3px; left: 91.3px; font-size: 19.3px;">import subprocess </div>
+<div class="positioned-text" style="top: 609.4px; left: 91.3px; font-size: 19.3px;">from twisted.internet import reactor, defer </div>
+<div class="positioned-text" style="top: 632.8px; left: 82.2px; font-size: 27.5px;"> </div>
+<div class="positioned-text" style="top: 663.5px; left: 91.3px; font-size: 19.3px;">class TracerouteCmd: </div>
+<div class="positioned-text" style="top: 690.4px; left: 111.1px; font-size: 19.3px;">def init (self): </div>
+<div class="positioned-text" style="top: 717.7px; left: 130.4px; font-size: 19.3px;">self.deferred = defer.Deferred() </div>
+<div class="positioned-text" style="top: 741.1px; left: 82.2px; font-size: 27.5px;"> </div>
+<div class="positioned-text" style="top: 771.7px; left: 111.1px; font-size: 19.3px;">def traceroute(self, host): </div>
+<div class="positioned-text" style="top: 798.8px; left: 130.4px; font-size: 19.3px;">process = subprocess.Popen([&#x27;traceroute&#x27;, &#x27;-m&#x27;, &#x27;10&#x27;, host], stdout=subprocess.PIPE) </div>
+<div class="positioned-text" style="top: 825.8px; left: 130.0px; font-size: 19.3px;">output, error = process.communicate() </div>
+<div class="positioned-text" style="top: 852.9px; left: 130.4px; font-size: 19.3px;">if error: </div>
+<div class="positioned-text" style="top: 880.0px; left: 149.8px; font-size: 19.3px;">self.deferred.errback(error) </div>
+<div class="positioned-text" style="top: 906.9px; left: 130.4px; font-size: 19.3px;">else: </div>
+<div class="positioned-text" style="top: 934.2px; left: 149.8px; font-size: 19.3px;">self.deferred.callback(output) </div>
+<div class="positioned-text" style="top: 957.6px; left: 82.2px; font-size: 27.5px;"> </div>
+<div class="positioned-text" style="top: 988.2px; left: 91.3px; font-size: 19.3px;">def print_result(result): </div>
+<div class="positioned-text" style="top: 1015.3px; left: 111.1px; font-size: 19.3px;">print(result.decode()) </div>
+<div class="positioned-text" style="top: 1043.0px; left: 82.2px; font-size: 23.4px;"> </div>
+<div class="positioned-text" style="top: 1069.2px; left: 91.3px; font-size: 19.3px;">def print_error(failure): </div>
+<div class="positioned-text" style="top: 1096.3px; left: 111.1px; font-size: 19.3px;">print(failure) </div>
+<div class="positioned-text" style="top: 1124.1px; left: 82.2px; font-size: 23.4px;"> </div>
+<div class="positioned-text" style="top: 1150.5px; left: 91.3px; font-size: 19.3px;">protocol = TracerouteCmd() </div>
+<div class="positioned-text" style="top: 1177.5px; left: 91.3px; font-size: 19.3px;">protocol.traceroute(&#x27;google.com&#x27;) </div>
+<div class="positioned-text" style="top: 1204.5px; left: 91.3px; font-size: 19.3px;">protocol.deferred.addCallbacks(print_result, print_error) </div>
+<div class="positioned-text" style="top: 1231.5px; left: 91.3px; font-size: 19.3px;">reactor.run() </div>
+                </div>
+            </body>
+            </html>
+            
