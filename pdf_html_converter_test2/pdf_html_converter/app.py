@@ -1,8 +1,3 @@
-#contains errors
-
-
-
-
 from flask import Flask, request, render_template_string, render_template, jsonify
 import fitz  # PyMuPDF
 import pdfplumber
@@ -11,11 +6,13 @@ import html
 import re
 import time
 import base64
-from io import BytesIO
 import threading
-from validation import validate_pdf
 import uuid
-from collections import defaultdict
+from validation import validate_pdf
+from io import BytesIO
+from fontTools.ttLib import TTFont
+from bs4 import BeautifulSoup
+import json
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
@@ -24,169 +21,124 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Store conversion progress
 conversion_progress = {}
 
-# Map common PDF font names to CSS-friendly web font stacks
-FONT_MAP = {
-    # Serif Fonts
-    'timesnewroman': '"Times New Roman", serif',
-    'times': '"Times New Roman", serif',
-    'georgia': 'Georgia, serif',
-    'cambria': 'Cambria, serif',
-    'garamond': 'Garamond, serif',
+# ---------- HTML → JSON HELPER ----------
+def html_to_json(html_content, json_path):
+    soup = BeautifulSoup(html_content, "html.parser")
+    pages_data = []
 
-    # Sans-serif Fonts
-    'arial': 'Arial, sans-serif',
-    'arialmt': '"Arial MT", Arial, Helvetica, sans-serif',
-    'calibri': 'Calibri, sans-serif',
-    'helvetica': 'Helvetica, sans-serif',
-    'tahoma': 'Tahoma, sans-serif',
-    'verdana': 'Verdana, sans-serif',
-    'segoeui': '"Segoe UI", sans-serif',
-    'sourcesans': '"Source Sans Pro", Arial, sans-serif',
-    'opensans': '"Open Sans", sans-serif',
-    'roboto': 'Roboto, sans-serif',
+    for page_idx, page_div in enumerate(soup.select(".page-container"), start=1):
+        page_obj = {
+            "page_number": page_idx,
+            "elements": []
+        }
 
-    # Monospace Fonts
-    'courier': 'Courier, monospace',
-    'couriernew': '"Courier New", monospace',
-    'consolas': 'Consolas, monospace',
-    'monaco': 'Monaco, monospace',
+        # Extract positioned text
+        for text_div in page_div.select(".positioned-text"):
+            style = text_div.get("style", "")
+            page_obj["elements"].append({
+                "type": "text",
+                "text": text_div.get_text(),
+                "style": style
+            })
 
-    # Decorative / Others
-    'impact': 'Impact, sans-serif',
-    'comic': '"Comic Sans MS", cursive, sans-serif',
-    'lucida': '"Lucida Console", monospace',
+        # Extract positioned images
+        for img_div in page_div.select(".positioned-image"):
+            img_tag = img_div.find("img")
+            if img_tag:
+                style = img_div.get("style", "")
+                src = img_tag.get("src", "")
+                page_obj["elements"].append({
+                    "type": "image",
+                    "style": style,
+                    "src": src
+                })
 
-    # Fallback
-    'default': 'Arial, sans-serif'
-}
+        # Extract tables
+        for table in page_div.find_all("table"):
+            rows = []
+            for tr in table.find_all("tr"):
+                row_data = []
+                for td in tr.find_all("td"):
+                    cell_data = {
+                        "text": td.get_text(strip=True),
+                        "rowspan": td.get("rowspan"),
+                        "colspan": td.get("colspan")
+                    }
+                    row_data.append(cell_data)
+                rows.append(row_data)
+            page_obj["elements"].append({
+                "type": "table",
+                "rows": rows
+            })
 
+        pages_data.append(page_obj)
 
-def get_cell_background_color(page_mupdf, cell_bbox):
-    """Extract background color from a cell area"""
+    json_data = {
+        "document": {
+            "pages": pages_data
+        }
+    }
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, indent=4, ensure_ascii=False)
+
+    return json_data
+
+# ---------- FONT EXTRACTION ----------
+def extract_fonts_as_css(pdf_doc):
+    css_rules = []
+    seen_fonts = {}
     try:
-        # Get drawings and vector graphics in the cell area
-        drawings = page_mupdf.get_drawings()
-        for drawing in drawings:
-            rect = drawing.get('rect', fitz.Rect())
-            if rect and cell_bbox:
-                # Check if the drawing overlaps with the cell
-                cell_rect = fitz.Rect(cell_bbox)
-                if rect.intersects(cell_rect):
-                    # Check for fill color
-                    fill = drawing.get('fill')
-                    if fill:
-                        # Convert color to hex
-                        if isinstance(fill, (list, tuple)) and len(fill) >= 3:
-                            r, g, b = [int(c * 255) for c in fill[:3]]
-                            return f"#{r:02x}{g:02x}{b:02x}"
-    except:
-        pass
-    return None
+        for page in pdf_doc:
+            try:
+                fonts = page.get_fonts(full=True)
+            except Exception as e:
+                print(f"[Font list error on page {page.number}]: {e}")
+                continue
 
+            for font in fonts:
+                xref = font[0]
+                internal_name = font[3]
+                if not internal_name or internal_name in seen_fonts:
+                    continue
+                try:
+                    ext, font_bytes, font_desc, font_name = pdf_doc.extract_font(xref)
+                    display_name = internal_name
+                    if isinstance(font_bytes, (bytes, bytearray)) and font_bytes:
+                        try:
+                            font_file = BytesIO(font_bytes)
+                            tt = TTFont(font_file)
+                            name_record = tt['name'].getName(4, 3, 1, 1033) or tt['name'].getName(4, 1, 0, 0)
+                            if name_record:
+                                display_name = str(name_record)
+                        except Exception as e:
+                            print(f"[FontTools Error] Could not read full name for {internal_name}: {e}")
+                    else:
+                        print(f"[Font Extraction Warning] No embedded data for {internal_name}")
 
-def process_table_with_spans(table, page_mupdf, scale):
-    """Process table with proper rowspan and colspan handling"""
-    if not table.cells:
-        return ""
+                    normalized_display_name = re.sub(
+                        r'[, \-](bold|italic|oblique)', '', display_name, flags=re.IGNORECASE
+                    ).strip()
+                    seen_fonts[internal_name] = normalized_display_name
 
-    try:
-        # Get the table data first
-        table_data = table.extract()
-        if not table_data:
-            return ""
-
-        # Get table bbox for color extraction
-        table_bbox = table.bbox
-
-        # For more advanced span detection, we need to analyze the table structure
-        # This is a simplified version that handles basic cases
-
-        # Check if we can access cell information properly
-        cells_info = []
-        if hasattr(table, 'cells') and table.cells:
-            for cell_bbox in table.cells:
-                if isinstance(cell_bbox, (tuple, list)) and len(cell_bbox) >= 4:
-                    cells_info.append(cell_bbox)
-
-        # Build HTML table
-        table_html = '<table style="width: 100%; height: 100%; border-collapse: collapse;">'
-
-        for row_idx, row in enumerate(table_data):
-            table_html += '<tr>'
-            for col_idx, cell_content in enumerate(row):
-                content = html.escape(cell_content or "")
-
-                # Try to get cell background color
-                bg_color = None
-                if cells_info and (row_idx * len(row) + col_idx) < len(cells_info):
-                    try:
-                        cell_bbox = cells_info[row_idx * len(row) + col_idx]
-                        bg_color = get_cell_background_color(page_mupdf, cell_bbox)
-                    except:
-                        pass
-
-                bg_style = f"background-color: {bg_color};" if bg_color else ""
-
-                # For now, we'll detect basic merged cells by looking for empty cells
-                # and checking if the previous cell should span
-                rowspan = 1
-                colspan = 1
-
-                # Simple merge detection: if next cells in row are empty, extend colspan
-                if col_idx < len(row) - 1:
-                    next_cells_empty = 0
-                    for next_col in range(col_idx + 1, len(row)):
-                        if not row[next_col] or row[next_col].strip() == "":
-                            next_cells_empty += 1
-                        else:
-                            break
-
-                    # If current cell has content and next cells are empty, span them
-                    if content.strip() and next_cells_empty > 0:
-                        colspan = 1 + next_cells_empty
-
-                # Build cell attributes
-                cell_attrs = []
-                if rowspan > 1:
-                    cell_attrs.append(f'rowspan="{rowspan}"')
-                if colspan > 1:
-                    cell_attrs.append(f'colspan="{colspan}"')
-
-                attrs_str = ' ' + ' '.join(cell_attrs) if cell_attrs else ''
-
-                # Skip rendering if this cell is part of a previous cell's span
-                if col_idx > 0:
-                    # Check if previous cell in this row has content and current is empty
-                    prev_content = row[col_idx - 1] if col_idx - 1 >= 0 else ""
-                    if not content.strip() and prev_content and prev_content.strip():
-                        # This cell is likely part of the previous cell's span
-                        continue
-
-                table_html += f'<td{attrs_str} style="border: 1px solid #000; padding: 4px; vertical-align: top; font-size: 12px; {bg_style}">{content}</td>'
-
-            table_html += '</tr>'
-
-        table_html += '</table>'
-        return table_html
+                    if isinstance(font_bytes, (bytes, bytearray)) and font_bytes:
+                        mime_type = "font/woff" if ext.lower() == "woff" else "font/ttf"
+                        b64_font = base64.b64encode(font_bytes).decode("utf-8")
+                        css_rules.append(f"""
+                            @font-face {{
+                                font-family: '{normalized_display_name}';
+                                src: url(data:{mime_type};base64,{b64_font}) format('{ext.lower()}');
+                            }}
+                        """)
+                except Exception as e:
+                    print(f"[Font Extraction Error] {internal_name}: {e}")
 
     except Exception as e:
-        # Fallback to simple table if advanced processing fails
-        table_data = table.extract()
-        table_html = '<table style="width: 100%; height: 100%; border-collapse: collapse;">'
+        print(f"[extract_fonts_as_css Error]: {e}")
+    return "\n".join(css_rules), seen_fonts
 
-        for row in table_data:
-            table_html += '<tr>'
-            for cell in row:
-                content = html.escape(cell or "")
-                table_html += f'<td style="border: 1px solid #000; padding: 4px; vertical-align: top; font-size: 12px;">{content}</td>'
-            table_html += '</tr>'
-
-        table_html += '</table>'
-        return table_html
-
-
+# ---------- PDF CONVERSION ----------
 def convert_pdf_with_progress(filename, job_id):
-    """Convert PDF with progress tracking"""
     try:
         conversion_progress[job_id] = {
             'status': 'starting',
@@ -201,20 +153,17 @@ def convert_pdf_with_progress(filename, job_id):
         target_width = 960
         full_html = ""
 
-        # Convert entire PDF to base64 for display
-        conversion_progress[job_id]['message'] = 'Preparing PDF for display...'
+        # Convert entire PDF to base64
         with open(filename, 'rb') as pdf_file:
             pdf_base64 = base64.b64encode(pdf_file.read()).decode('utf-8')
             conversion_progress[job_id]['pdf_base64'] = pdf_base64
 
-        # Open PDF documents
-        conversion_progress[job_id]['message'] = 'Opening PDF document...'
         pdf_doc = fitz.open(filename)
         pdf_plumber = pdfplumber.open(filename)
         total_pages = len(pdf_doc)
 
+        font_css, font_name_map = extract_fonts_as_css(pdf_doc)
         conversion_progress[job_id]['progress'] = 5
-        conversion_progress[job_id]['message'] = f'Processing {total_pages} pages...'
 
         for page_num, (page_mupdf, page_plumber) in enumerate(zip(pdf_doc, pdf_plumber.pages)):
             # Update progress
@@ -227,7 +176,7 @@ def convert_pdf_with_progress(filename, job_id):
             scale = target_width / page_width
             elements = []
 
-            # Get tables with enhanced processing
+            # Detect tables
             tables = page_plumber.find_tables()
             table_bboxes = [table.bbox for table in tables]
 
@@ -238,8 +187,19 @@ def convert_pdf_with_progress(filename, job_id):
                         return True
                 return False
 
-            # Process text blocks
+            # Find max text width for padding calc
             blocks = page_mupdf.get_text("dict")["blocks"]
+            max_text_width = 0
+            for block in blocks:
+                if block["type"] != 0:
+                    continue
+                for line in block["lines"]:
+                    for span in line["spans"]:
+                        text_width = span["bbox"][2] - span["bbox"][0]
+                        if text_width > max_text_width:
+                            max_text_width = text_width
+
+            # Text extraction with real fonts
             for block in blocks:
                 if block["type"] != 0:
                     continue
@@ -251,36 +211,42 @@ def convert_pdf_with_progress(filename, job_id):
                         text = html.escape(span["text"])
                         if not text.strip():
                             continue
+
                         font_size = round(span["size"] * scale, 1)
                         font_color = "#{:06x}".format(span["color"])
-                        font_name = span.get("font", "").lower()
-                        is_bold = "bold" in font_name
-                        is_italic = "italic" in font_name or "oblique" in font_name
 
-                        # Extract base font name
-                        font_base = re.sub(r'[^a-zA-Z]', '', font_name.split(',')[0]).lower()
+                        internal_font = span.get("font", "Arial")
 
-                        if font_base:
-                            font_base = font_base[0]
-                        else:
-                            font_base = 'default'
-                        font_family = FONT_MAP.get(font_base, FONT_MAP['default'])
+                        # ✅ Normalize font family (remove style suffix like -Bold, -Italic)
+                        # Remove , or - or space followed by bold/italic/oblique at the end or in the middle
+                        normalized_font = re.sub(r'[, \-](bold|italic|oblique)', '', internal_font,
+                                                 flags=re.IGNORECASE).strip()
+                        font_family = font_name_map.get(normalized_font, normalized_font)
 
-                        left = round(x0 * scale, 1)
-                        top = round(y0 * scale, 1)
+                        # Detect bold/italic from original internal name
+                        is_bold = "bold" in internal_font.lower()
+                        is_italic = "italic" in internal_font.lower() or "oblique" in internal_font.lower()
 
-                        text = re.sub(r'(https?://[^"]+)', r'<a href="\1" target="_blank">\1</a>', text)
+                        LEFT_PADDING = 0.8
+                        RIGHT_PADDING = max(1.0, (page_width - max_text_width) * scale / 50)
+                        left = round(x0 * scale, 1) + LEFT_PADDING
+                        right = round((page_width - x1) * scale, 1) + RIGHT_PADDING
+
+                        # Preserve URLs inside text
+                        text = re.sub(r'(https?://[^\s<]+)', r'<a href="\1" target="_blank">\1</a>', text)
 
                         style = (
-                            f"top: {top}px; left: {left}px; font-size: {font_size}px; "
-                            f"color: {font_color}; font-family: {font_family}; "
+                            f"top: {round(y0 * scale, 1)}px; "
+                            f"left: {left}px; right: {right}px; "
+                            f"font-size: {font_size:.2f}px; color: {font_color}; font-family: '{font_family}'; "
                             f"{'font-weight: bold;' if is_bold else ''}"
                             f"{'font-style: italic;' if is_italic else ''}"
+                            f"white-space: pre;"
                         )
 
                         elements.append(f'<div class="positioned-text" style="{style}">{text}</div>')
 
-            # Process images
+            # Images
             for img_index, img in enumerate(page_mupdf.get_images(full=True)):
                 xref = img[0]
                 pix = fitz.Pixmap(pdf_doc, xref)
@@ -288,33 +254,93 @@ def convert_pdf_with_progress(filename, job_id):
                     pix = fitz.Pixmap(fitz.csRGB, pix)
                 img_bytes = pix.tobytes("png")
                 img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-
                 rects = page_mupdf.get_image_rects(xref)
                 for rect in rects:
                     left = round(rect.x0 * scale, 1)
                     top = round(rect.y0 * scale, 1)
                     width = round((rect.x1 - rect.x0) * scale, 1)
                     height = round((rect.y1 - rect.y0) * scale, 1)
-
                     elements.append(f'''
                         <div class="positioned-image" style="top: {top}px; left: {left}px; width: {width}px; height: {height}px;">
                             <img src="data:image/png;base64,{img_base64}" style="width: 100%; height: 100%; object-fit: contain;">
                         </div>
                     ''')
 
-            # Process tables with enhanced span support
-            for table in tables:
+
+            # Process tables (unchanged)
+            for table in page_plumber.find_tables():
                 if not table.cells:
                     continue
-
                 x0, top, x1, bottom = table.bbox
                 width = (x1 - x0) * scale
                 height = (bottom - top) * scale
                 top_scaled = top * scale
                 left_scaled = x0 * scale
 
-                # Use enhanced table processing
-                table_html = process_table_with_spans(table, page_mupdf, scale)
+                table_data = table.extract()
+                if not table_data:
+                    continue
+
+                rows = len(table_data)
+                cols = max(len(row) for row in table_data) if table_data else 0
+                grid = [[None for _ in range(cols)] for _ in range(rows)]
+                occupied = set()
+
+                for row_idx, row in enumerate(table_data):
+                    col_idx = 0
+                    for cell_idx, cell in enumerate(row):
+                        while (row_idx, col_idx) in occupied:
+                            col_idx += 1
+                        if col_idx >= cols:
+                            break
+                        if cell is None:
+                            continue
+
+                        rowspan = 1
+                        colspan = 1
+
+                        if cell_idx < len(row) - 1 and row[cell_idx + 1] is None:
+                            next_col = col_idx + 1
+                            while next_col < cols and (row_idx, next_col) not in occupied and (next_col >= len(row) or row[next_col] is None):
+                                colspan += 1
+                                next_col += 1
+
+                        if row_idx < len(table_data) - 1 and len(table_data[row_idx + 1]) > col_idx and table_data[row_idx + 1][col_idx] is None:
+                            next_row = row_idx + 1
+                            while next_row < rows and (next_row, col_idx) not in occupied and (col_idx >= len(table_data[next_row]) or table_data[next_row][col_idx] is None):
+                                rowspan += 1
+                                next_row += 1
+
+                        for r in range(row_idx, row_idx + rowspan):
+                            for c in range(col_idx, col_idx + colspan):
+                                if r < rows and c < cols:
+                                    occupied.add((r, c))
+
+                        grid[row_idx][col_idx] = {
+                            'content': html.escape(cell or ""),
+                            'rowspan': rowspan if rowspan > 1 else None,
+                            'colspan': colspan if colspan > 1 else None
+                        }
+                        col_idx += colspan
+
+                table_html = "<table>"
+                for r_idx in range(rows):
+                    table_html += "<tr>"
+                    for c_idx in range(cols):
+                        if (r_idx, c_idx) in occupied and grid[r_idx][c_idx] is None:
+                            continue
+                        cell = grid[r_idx][c_idx]
+                        if cell:
+                            attributes = ""
+                            if cell['rowspan']:
+                                attributes += f' rowspan="{cell["rowspan"]}"'
+                            if cell['colspan']:
+                                attributes += f' colspan="{cell["colspan"]}"'
+                            table_html += f"<td{attributes}>{cell['content']}</td>"
+                        else:
+                            table_html += "<td></td>"
+                    table_html += "</tr>"
+                table_html += "</table>"
 
                 elements.append(f"""
                 <div style="position: absolute; top: {top_scaled}px; left: {left_scaled}px;
@@ -332,10 +358,9 @@ def convert_pdf_with_progress(filename, job_id):
         # Finalizing
         conversion_progress[job_id]['progress'] = 95
         conversion_progress[job_id]['message'] = 'Finalizing HTML output...'
-
         pdf_plumber.close()
         conversion_time = round(time.time() - start_time, 2)
-
+        print(font_css)
         # Create comparison view HTML
         final_html = f'''
         <!DOCTYPE html>
@@ -344,6 +369,7 @@ def convert_pdf_with_progress(filename, job_id):
             <meta charset="utf-8">
             <title>PDF to HTML Comparison</title>
             <style>
+                {font_css}
                 body {{
                     font-family: Arial, sans-serif;
                     margin: 0;
@@ -431,32 +457,16 @@ def convert_pdf_with_progress(filename, job_id):
                     vertical-align: top;
                     font-size: 12px;
                 }}
-                .controls {{
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: rgba(52, 73, 94, 0.9);
-                    color: white;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    z-index: 1000;
-                    font-size: 12px;
-                }}
             </style>
             <script>
                 const t0 = performance.now();
                 window.onload = () => {{
                     const t1 = performance.now();
                     document.getElementById("render-time").innerText = (t1 - t0).toFixed(2) + " ms";
-
-                    // Sync scrolling between panels
                     const pdfPanel = document.querySelector('.pdf-panel');
                     const htmlPanel = document.querySelector('.html-panel');
-
                     let isScrollingPdf = false;
                     let isScrollingHtml = false;
-
                     pdfPanel.addEventListener('scroll', () => {{
                         if (isScrollingHtml) return;
                         isScrollingPdf = true;
@@ -464,7 +474,6 @@ def convert_pdf_with_progress(filename, job_id):
                         htmlPanel.scrollTop = ratio * (htmlPanel.scrollHeight - htmlPanel.clientHeight);
                         setTimeout(() => isScrollingPdf = false, 50);
                     }});
-
                     htmlPanel.addEventListener('scroll', () => {{
                         if (isScrollingPdf) return;
                         isScrollingHtml = true;
@@ -482,7 +491,6 @@ def convert_pdf_with_progress(filename, job_id):
                 <b>Render time:</b> <span id="render-time">...</span> |
                 <b>Pages:</b> {total_pages}
             </div>
-
             <div class="comparison-container">
                 <div class="pdf-panel">
                     <div class="panel-header">Original PDF</div>
@@ -490,7 +498,6 @@ def convert_pdf_with_progress(filename, job_id):
                         <embed class="pdf-embed" src="data:application/pdf;base64,{pdf_base64}" type="application/pdf" />
                     </div>
                 </div>
-
                 <div class="html-panel">
                     <div class="panel-header">Converted HTML</div>
                     <div class="html-content">
@@ -498,12 +505,73 @@ def convert_pdf_with_progress(filename, job_id):
                     </div>
                 </div>
             </div>
-
-
         </body>
         </html>
         '''
 
+        clean_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Converted PDF (Clean)</title>
+                    <style>
+                        {font_css}
+                        body {{
+                            font-family: Arial, sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            background: #f5f5f5;
+                        }}
+                        .page-container {{
+                            position: relative;
+                            margin: 30px auto;
+                            background: white;
+                            border: 1px solid #ccc;
+                            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                            width: {target_width}px;
+                        }}
+                        .positioned-text {{
+                            position: absolute;
+                            white-space: pre;
+                            text-decoration: none;
+                        }}
+                        .positioned-text a {{
+                            color: blue;
+                            text-decoration: underline;
+                        }}
+                        .positioned-image {{
+                            position: absolute;
+                            object-fit: contain;
+                        }}
+                        table {{
+                            border-collapse: collapse;
+                            width: 100%;
+                            height: 100%;
+                        }}
+                        table td {{
+                            border: 1px solid #000;
+                            padding: 4px;
+                            vertical-align: top;
+                            font-size: 12px;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    {full_html}
+                </body>
+                </html>
+                """
+
+        output_dir = "output"
+        os.makedirs(output_dir, exist_ok=True)
+        output_filename = os.path.splitext(os.path.basename(filename))[0] + ".html"
+        output_path = os.path.join(output_dir, output_filename)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(clean_html)
+        # Save JSON alongside HTML
+        json_path = os.path.join(output_dir, os.path.splitext(os.path.basename(filename))[0] + ".json")
+        html_to_json(clean_html, json_path)
         conversion_progress[job_id]['progress'] = 100
         conversion_progress[job_id]['status'] = 'completed'
         conversion_progress[job_id]['message'] = f'Conversion completed in {conversion_time} seconds'
@@ -520,31 +588,22 @@ def upload_form():
     return render_template('index.html')
 
 
-from flask import jsonify
-
 @app.route('/convert', methods=['POST'])
 def convert_pdf():
     uploaded_file = request.files['pdf']
     filename = os.path.join(UPLOAD_FOLDER, uploaded_file.filename)
     uploaded_file.save(filename)
-
-    # Run validation
     errors = validate_pdf(filename)
     if errors:
         return jsonify({
             'status': 'error',
             'message': ' | '.join(errors)
         }), 400  # Bad request
-
-    # Proceed if valid
     job_id = str(uuid.uuid4())
     thread = threading.Thread(target=convert_pdf_with_progress, args=(filename, job_id))
     thread.daemon = True
     thread.start()
-
     return jsonify({'status': 'ok', 'job_id': job_id})
-
-
 
 
 @app.route('/progress/<job_id>')
@@ -557,7 +616,6 @@ def get_progress(job_id):
 
 @app.route('/compare/<job_id>')
 def compare_view(job_id):
-    """Render the comparison view using template"""
     if job_id in conversion_progress:
         progress = conversion_progress[job_id]
         if progress['status'] == 'completed':
@@ -575,7 +633,6 @@ def get_result(job_id):
     if job_id in conversion_progress:
         progress = conversion_progress[job_id]
         if progress['status'] == 'completed':
-            # Clean up the progress data
             del conversion_progress[job_id]
             return render_template_string(progress['result'])
         else:
